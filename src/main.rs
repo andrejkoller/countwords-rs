@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 
@@ -25,12 +26,20 @@ fn main() {
 fn count_words(text: &str) -> HashMap<String, usize> {
     let mut word_count = HashMap::new();
 
+    let stopwords: HashSet<&str> = [
+        "the", "and", "is", "in", "to", "of", "a", "that", "it", "on", "for", "with", "as", "was",
+        "at", "by", "an", "be", "this", "from",
+    ]
+    .iter()
+    .cloned()
+    .collect();
+
     for word in text.split_whitespace() {
         let clean = word
             .trim_matches(|c: char| !c.is_alphanumeric())
             .to_lowercase();
 
-        if !clean.is_empty() {
+        if !clean.is_empty() && !stopwords.contains(&clean.as_str()) {
             *word_count.entry(clean).or_insert(0) += 1;
         }
     }
