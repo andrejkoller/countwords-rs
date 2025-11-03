@@ -10,12 +10,18 @@ fn main() {
         return;
     }
 
-    let filename = &args[1];
+    let mut combined_text = String::new();
 
-    let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
+    for filename in &args[1..] {
+        let contents = fs::read_to_string(filename)
+            .unwrap_or_else(|_| panic!("Error reading file {}", filename));
+        combined_text.push_str(&contents);
+        combined_text.push('\n');
+    }
 
-    let word_count = count_words(&contents);
+    let word_count = count_words(&combined_text);
 
+    println!("Analysis of files: {:?}", &args[1..]);
     println!("Number of words: {}", word_count.len());
     println!("Top 10 most common words:");
     for (word, count) in top_words(&word_count, 10) {
