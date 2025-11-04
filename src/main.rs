@@ -1,40 +1,65 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::env;
+use clap::{Arg, Command};
+use std::collections::{HashMap, HashSet};
 use std::fs;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        eprintln!("Usage: {} <filename>", args[0]);
-        return;
-    }
+    let matches = Command::new("WordCounter")
+        .version("1.0")
+        .author("Andrej Koller <andrejkoller@outlook.com>")
+        .about("Counts word frequencies in text files")
+        .arg(
+            Arg::new("files")
+                .help("One or more text files to analyze")
+                .required(true)
+                .num_args(1..),
+        )
+        .arg(
+            Arg::new("top")
+                .short('t')
+                .long("top")
+                .help("Show only the N most frequent words")
+                .default_value("10"),
+        )
+        .arg(
+            Arg::new("ignore-stopwords")
+                .long("ignore-stopwords")
+                .help("Ignore common stopwords like 'the', 'and', 'is'")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .get_matches();
+
+    let files: Vec<_> = matches.get_many::<String>("files").unwrap().collect();
+    let top_n: usize = matches
+        .get_one::<String>("top")
+        .unwrap()
+        .parse()
+        .unwrap_or(10);
+    let ignore_stopwords = matches.get_flag("ignore-stopwords");
 
     let mut combined_text = String::new();
-
-    for filename in &args[1..] {
+    for filename in &files {
         let contents = fs::read_to_string(filename)
             .unwrap_or_else(|_| panic!("Error reading file {}", filename));
         combined_text.push_str(&contents);
         combined_text.push('\n');
     }
 
-    let word_count = count_words(&combined_text);
+    let word_count = count_words(&combined_text, ignore_stopwords);
 
-    println!("Analysis of files: {:?}", &args[1..]);
-    println!("Number of words: {}", word_count.len());
-    println!("Top 10 most common words:");
-    for (word, count) in top_words(&word_count, 10) {
-        println!("{}: {}", word, count);
+    println!("Analyzed files: {:?}", files);
+    println!("Unique words found: {}", word_count.len());
+    println!("\nTop {} most frequent words:", top_n);
+    for (word, count) in top_words(&word_count, top_n) {
+        println!("{:<15} {}", word, count);
     }
 }
 
-fn count_words(text: &str) -> HashMap<String, usize> {
-    let mut word_count = HashMap::new();
+fn count_words(text: &str, ignore_stopwords: bool) -> HashMap<String, usize> {
+    let mut counts = HashMap::new();
 
     let stopwords: HashSet<&str> = [
-        "the", "and", "is", "in", "to", "of", "a", "that", "it", "on", "for", "with", "as", "was",
-        "at", "by", "an", "be", "this", "from",
+        "the", "and", "is", "a", "an", "to", "in", "on", "for", "of", "with", "by", "at", "it",
+        "as", "from", "this", "that", "be", "or", "was", "are", "not", "but",
     ]
     .iter()
     .cloned()
@@ -45,12 +70,18 @@ fn count_words(text: &str) -> HashMap<String, usize> {
             .trim_matches(|c: char| !c.is_alphanumeric())
             .to_lowercase();
 
-        if !clean.is_empty() && !stopwords.contains(&clean.as_str()) {
-            *word_count.entry(clean).or_insert(0) += 1;
+        if clean.is_empty() {
+            continue;
         }
+
+        if ignore_stopwords && stopwords.contains(clean.as_str()) {
+            continue;
+        }
+
+        *counts.entry(clean).or_insert(0) += 1;
     }
 
-    word_count
+    counts
 }
 
 fn top_words(counts: &HashMap<String, usize>, n: usize) -> Vec<(String, usize)> {
